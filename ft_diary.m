@@ -6,6 +6,15 @@ function ft_diary(status, varargin)
 % code output files were created.
 % Call ft_diary('on') at the start of the function that should be logged,
 % and ft_diary('off') at the end.
+% optional inputs: 
+% - 'filename': string, full path of where diary should be saved (default =
+% same full filename as caller function, but with .txt extension. If
+% variable 'filename' is specified in caller function, the diaryname will
+% also get this name (with .txt extension).
+% - 'extension': string, extesion of diary file (default = .txt), cannot be
+% .m or .mat.
+% MVE MAY 2017
+
 persistent tmpdiaryname
 [ST, ~] = dbstack('-completenames');
 workSpace = evalin('caller', 'whos'); % get all the variables from the caller function.
