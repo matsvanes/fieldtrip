@@ -7,7 +7,8 @@ function ft_diary(status, varargin)
 % function is submitted to the computing cluster, but more flexible and
 % with more consistent naming w.r.t. saved files in the function.
 % Call ft_diary('on') at the start of the function that should be logged,
-% and ft_diary('off') at the end.
+% and ft_diary('off') at the end. If function 1 calls ft_diary and function
+% 2, and function 2 also calls ft_diary, two seperate diaries are made.
 % optional inputs: 
 % - 'filename': string, full path of where diary should be saved (default =
 % same full filename as caller function, but with .txt extension. If
@@ -15,18 +16,19 @@ function ft_diary(status, varargin)
 % also get this name (with .txt extension).
 % - 'extension': string, extesion of diary file (default = .txt), cannot be
 % .m or .mat.
-% MVE MAY 2017
+% MVE JUNE 2017
 
-persistent tmpdiaryname
+persistent tmpdiaryname diarycounter
 [ST, ~] = dbstack('-completenames');
 workSpace = evalin('caller', 'whos'); % get all the variables from the caller function.
 
 if strcmp(status, 'on')
+    diarycounter = sum([diarycounter 1]); % diarycounter=diarycounter+1 doesn't work because []+scalar=[];
     if ~exist(fullfile([getenv('HOME'), '/tmp'])) % create a tmp folder in the user's home directory if it is not already exists
         mkdir(fullfile([getenv('HOME'), '/tmp']));
     end
-    tmpdiaryname = tempname(fullfile([getenv('HOME'), '/tmp'])) % create a temporary filename for the diary in the user's tmp folder
-    diary(tmpdiaryname) % save command window output in a temporary file
+    tmpdiaryname{diarycounter} = tempname(fullfile([getenv('HOME'), '/tmp'])) % create a temporary filename for the diary in the user's tmp folder
+    diary(tmpdiaryname{diarycounter}) % save command window output in a temporary file
     datetime % print date and time
     sprintf('Matlab version %s',version) % print Matlab version
     sprintf('FieldTrip version %s', ft_version) % print fieldtrip version
@@ -111,5 +113,6 @@ elseif strcmp(status, 'off')
     diary off
     
     % save diary in correct path
-    movefile(tmpdiaryname, diaryname);
+    movefile(tmpdiaryname{diarycounter}, diaryname);
+    diarycounter = diarycounter-1;
 end
