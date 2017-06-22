@@ -32,6 +32,7 @@ if strcmp(status, 'on')
     % callers of ft_diary, their diary will be saved in the diary of the
     % top most caller function.
     if diarycounter==1
+        format compact
         tmpdiaryname = tempname(fullfile([getenv('HOME'), '/tmp'])) % create a temporary filename for the diary in the user's tmp folder
         diary(tmpdiaryname) % save command window output in a temporary file
         datetime % print date and time
@@ -120,6 +121,7 @@ elseif strcmp(status, 'off')
     % save diary in correct path
     if diarycounter==1
     movefile(tmpdiaryname, diaryname);
+    format % set formatting to default
     end
     diarycounter = diarycounter-1;
 end
