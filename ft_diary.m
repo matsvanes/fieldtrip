@@ -3,7 +3,9 @@ function ft_diary(status, varargin)
 % use of Matlab's diary function for this, but it also prints additional
 % information at the start, like the function script, input variables and
 % Matlab and FieldTrip versions. This function is meant to log with which
-% code output files were created.
+% code output files were created. It is similar to the ouput files when a
+% function is submitted to the computing cluster, but more flexible and
+% with more consistent naming w.r.t. saved files in the function.
 % Call ft_diary('on') at the start of the function that should be logged,
 % and ft_diary('off') at the end.
 % optional inputs: 
