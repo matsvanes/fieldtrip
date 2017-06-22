@@ -8,7 +8,8 @@ function ft_diary(status, varargin)
 % with more consistent naming w.r.t. saved files in the function.
 % Call ft_diary('on') at the start of the function that should be logged,
 % and ft_diary('off') at the end. If function 1 calls ft_diary and function
-% 2, and function 2 also calls ft_diary, two seperate diaries are made.
+% 2, and function 2 also calls ft_diary, the diaries are concatinated in
+% the diary of the topmost caller (in this case function 1).
 % optional inputs: 
 % - 'filename': string, full path of where diary should be saved (default =
 % same full filename as caller function, but with .txt extension. If
@@ -27,12 +28,16 @@ if strcmp(status, 'on')
     if ~exist(fullfile([getenv('HOME'), '/tmp'])) % create a tmp folder in the user's home directory if it is not already exists
         mkdir(fullfile([getenv('HOME'), '/tmp']));
     end
-    tmpdiaryname{diarycounter} = tempname(fullfile([getenv('HOME'), '/tmp'])) % create a temporary filename for the diary in the user's tmp folder
-    diary(tmpdiaryname{diarycounter}) % save command window output in a temporary file
-    datetime % print date and time
-    sprintf('Matlab version %s',version) % print Matlab version
-    sprintf('FieldTrip version %s', ft_version) % print fieldtrip version
-    
+    % only start new diary on first call of ft_diary. If there are multiple
+    % callers of ft_diary, their diary will be saved in the diary of the
+    % top most caller function.
+    if diarycounter==1
+        tmpdiaryname = tempname(fullfile([getenv('HOME'), '/tmp'])) % create a temporary filename for the diary in the user's tmp folder
+        diary(tmpdiaryname) % save command window output in a temporary file
+        datetime % print date and time
+        sprintf('Matlab version %s',version) % print Matlab version
+        sprintf('FieldTrip version %s', ft_version) % print fieldtrip version
+    end
     fname = ST(2).file % full path of caller function
     
     fid = fopen(fname); % open caller function and print all lines
@@ -113,6 +118,8 @@ elseif strcmp(status, 'off')
     diary off
     
     % save diary in correct path
-    movefile(tmpdiaryname{diarycounter}, diaryname);
+    if diarycounter==1
+    movefile(tmpdiaryname, diaryname);
+    end
     diarycounter = diarycounter-1;
 end
