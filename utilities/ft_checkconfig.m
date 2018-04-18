@@ -198,7 +198,13 @@ if ~isempty(allowed)
   fieldsused = fieldnames(cfg);
   [c, i] = setdiff(fieldsused, allowed);
   if ~isempty(c)
-    ft_error('The field cfg.%s is not allowed\n', c{1});
+    if silent
+      % don't mention it
+    elseif loose
+      ft_warning('The field cfg.%s is not allowed\n', c{1});
+    elseif pedantic
+      ft_error('The field cfg.%s is not allowed\n', c{1});
+    end
   end
 end
 
@@ -719,7 +725,7 @@ if (s.bytes <= max_size)
 end
 
 % these fields should not be handled recursively
-norecursion = {'event', 'headmodel', 'leadfield'};
+norecursion = {'event', 'headmodel', 'leadfield', 'grid'};
 
 fieldsorig = fieldnames(cfg);
 for i=1:numel(fieldsorig)

@@ -1,14 +1,13 @@
 function [data] = ft_checkdata(data, varargin)
 
-% FT_CHECKDATA checks the input data of the main FieldTrip functions, e.g. whether
-% the type of data strucure corresponds with the required data. If neccessary
-% and possible, this function will adjust the data structure to the input
-% requirements (e.g. change dimord, average over trials, convert inside from
-% index into logical).
+% FT_CHECKDATA checks the input data of the main FieldTrip functions, e.g. whether the
+% type of data strucure corresponds with the required data. If neccessary and possible,
+% this function will adjust the data structure to the input requirements (e.g. change
+% dimord, average over trials, convert inside from index into logical).
 %
-% If the input data does NOT correspond to the requirements, this function
-% is supposed to give a elaborate warning message and if applicable point
-% the user to external documentation (link to website).
+% If the input data does NOT correspond to the requirements, this function will give a
+% warning message and if applicable point the user to external documentation (link to
+% website).
 %
 % Use as
 %   [data] = ft_checkdata(data, ...)
@@ -20,10 +19,11 @@ function [data] = ft_checkdata(data, varargin)
 %   senstype           = ctf151, ctf275, ctf151_planar, ctf275_planar, neuromag122, neuromag306, bti148, bti248, bti248_planar, magnetometer, electrode
 %   inside             = logical, index
 %   ismeg              = yes, no
+%   iseeg              = yes, no
 %   isnirs             = yes, no
 %   hasunit            = yes, no
 %   hascoordsys        = yes, no
-%   hassampleinfo      = yes, no, ifmakessense (only applies to raw data)
+%   hassampleinfo      = yes, no, ifmakessense (applies to raw and timelock data)
 %   hascumtapcnt       = yes, no (only applies to freq data)
 %   hasdim             = yes, no
 %   hasdof             = yes, no
@@ -32,10 +32,13 @@ function [data] = ft_checkdata(data, varargin)
 %   segmentationstyle  = indexed, probabilistic (only applies to segmentation)
 %   parcellationstyle  = indexed, probabilistic (only applies to parcellation)
 %   hasbrain           = yes, no (only applies to segmentation)
+%   trialinfostyle     = matrix, table or empty
 %
 % For some options you can specify multiple values, e.g.
 %   [data] = ft_checkdata(data, 'senstype', {'ctf151', 'ctf275'}), e.g. in megrealign
 %   [data] = ft_checkdata(data, 'datatype', {'timelock', 'freq'}), e.g. in sourceanalysis
+%
+% See also FT_DATATYPE_XXX for each of the respective data types.
 
 % Copyright (C) 2007-2015, Robert Oostenveld
 % Copyright (C) 2010-2012, Martin Vinck
@@ -94,6 +97,7 @@ dtype                = ft_getopt(varargin, 'datatype'); % should not conflict wi
 dimord               = ft_getopt(varargin, 'dimord');
 stype                = ft_getopt(varargin, 'senstype'); % senstype is a function name which should not be masked
 ismeg                = ft_getopt(varargin, 'ismeg');
+iseeg                = ft_getopt(varargin, 'iseeg');
 isnirs               = ft_getopt(varargin, 'isnirs');
 inside               = ft_getopt(varargin, 'inside'); % can be 'logical' or 'index'
 hastrials            = ft_getopt(varargin, 'hastrials');
@@ -109,6 +113,7 @@ fsample              = ft_getopt(varargin, 'fsample');
 segmentationstyle    = ft_getopt(varargin, 'segmentationstyle'); % this will be passed on to the corresponding ft_datatype_xxx function
 parcellationstyle    = ft_getopt(varargin, 'parcellationstyle'); % this will be passed on to the corresponding ft_datatype_xxx function
 hasbrain             = ft_getopt(varargin, 'hasbrain');
+trialinfostyle       = ft_getopt(varargin, 'trialinfostyle');
 
 % check whether people are using deprecated stuff
 depHastrialdef = ft_getopt(varargin, 'hastrialdef');
@@ -237,6 +242,20 @@ if issource && isvolume
   issource = false;
 end
 
+if isfield(data, 'trialinfo')
+  if strcmp(trialinfostyle, 'table')
+    if ismatrix(data.trialinfo)
+      data.trialinfo = array2table(data.trialinfo);
+    end
+  elseif strcmp(trialinfostyle, 'matrix')
+    if istable(data.trialinfo)
+      data.trialinfo = table2array(data.trialinfo);
+    end
+  else
+    % no conversion is needed
+  end
+end
+
 % the ft_datatype_XXX functions ensures the consistency of the XXX datatype
 % and provides a detailed description of the dataformat and its history
 if iscomp % this should go before israw/istimelock/isfreq
@@ -244,7 +263,7 @@ if iscomp % this should go before israw/istimelock/isfreq
 elseif israw
   data = ft_datatype_raw(data, 'hassampleinfo', hassampleinfo);
 elseif istimelock
-  data = ft_datatype_timelock(data);
+  data = ft_datatype_timelock(data, 'hassampleinfo', hassampleinfo);
 elseif isfreq
   data = ft_datatype_freq(data);
 elseif isspike
@@ -378,7 +397,7 @@ if ~isempty(dtype)
       okflag = 1;
     elseif isequal(dtype(iCell), {'timelock+comp'}) && israw && iscomp
       data = raw2timelock(data);
-      data = ft_datatype_timelock(data);
+      data = ft_datatype_timelock(data, 'hassampleinfo', hassampleinfo);
       istimelock = 1;
       iscomp = 1;
       israw = 0;
@@ -391,7 +410,7 @@ if ~isempty(dtype)
       okflag = 1;
     elseif isequal(dtype(iCell), {'raw'}) && istimelock
       if iscomp
-        data = removefields(data, {'topo', 'topolabel', 'unmixing'}); % these fields are not desired
+        data = removefields(data, {'topo', 'topolabel', 'topodimord', 'unmixing', 'unmixingdimord'}); % these fields are not desired
         iscomp = 0;
       end
       data = timelock2raw(data);
@@ -401,56 +420,56 @@ if ~isempty(dtype)
       okflag = 1;
     elseif isequal(dtype(iCell), {'comp'}) && israw  && iscomp
       data = keepfields(data, {'label', 'topo', 'topolabel', 'unmixing', 'elec', 'grad', 'cfg'}); % these are the only relevant fields
-      data = ft_datatype_comp(data);
+      data = ft_datatype_comp(data, 'hassampleinfo', hassampleinfo);
       israw = 0;
       iscomp = 1;
       okflag = 1;
     elseif isequal(dtype(iCell), {'comp'}) && istimelock && iscomp
       data = keepfields(data, {'label', 'topo', 'topolabel', 'unmixing', 'elec', 'grad', 'cfg'}); % these are the only relevant fields
-      data = ft_datatype_comp(data);
+      data = ft_datatype_comp(data, 'hassampleinfo', hassampleinfo);
       istimelock = 0;
       iscomp = 1;
       okflag = 1;
     elseif isequal(dtype(iCell), {'comp'}) && isfreq && iscomp
       data = keepfields(data, {'label', 'topo', 'topolabel', 'unmixing', 'elec', 'grad', 'cfg'}); % these are the only relevant fields
-      data = ft_datatype_comp(data);
+      data = ft_datatype_comp(data, 'hassampleinfo', 'no'); % freq data does not have sampleinfo
       isfreq = 0;
       iscomp = 1;
       okflag = 1;
     elseif isequal(dtype(iCell), {'raw'}) && israw
       if iscomp
-        data = removefields(data, {'topo', 'topolabel', 'unmixing'}); % these fields are not desired
+        data = removefields(data, {'topo', 'topolabel', 'topodimord', 'unmixing', 'unmixingdimord'}); % these fields are not desired
         iscomp = 0;
       end
-      data = ft_datatype_raw(data);
+      data = ft_datatype_raw(data, 'hassampleinfo', hassampleinfo);
       okflag = 1;
     elseif isequal(dtype(iCell), {'timelock'}) && istimelock
       if iscomp
-        data = removefields(data, {'topo', 'topolabel', 'unmixing'}); % these fields are not desired
+        data = removefields(data, {'topo', 'topolabel', 'topodimord', 'unmixing', 'unmixingdimord'}); % these fields are not desired
         iscomp = 0;
       end
-      data = ft_datatype_timelock(data);
+      data = ft_datatype_timelock(data, 'hassampleinfo', hassampleinfo);
       okflag = 1;
     elseif isequal(dtype(iCell), {'freq'}) && isfreq
       if iscomp
-        data = removefields(data, {'topo', 'topolabel', 'unmixing'}); % these fields are not desired
+        data = removefields(data, {'topo', 'topolabel', 'topodimord', 'unmixing', 'unmixingdimord'}); % these fields are not desired
         iscomp = 0;
       end
       data = ft_datatype_freq(data);
       okflag = 1;
     elseif isequal(dtype(iCell), {'timelock'}) && israw
       if iscomp
-        data = removefields(data, {'topo', 'topolabel', 'unmixing'}); % these fields are not desired
+        data = removefields(data, {'topo', 'topolabel', 'topodimord', 'unmixing', 'unmixingdimord'}); % these fields are not desired
         iscomp = 0;
       end
       data = raw2timelock(data);
-      data = ft_datatype_timelock(data);
+      data = ft_datatype_timelock(data, 'hassampleinfo', hassampleinfo);
       israw = 0;
       istimelock = 1;
       okflag = 1;
     elseif isequal(dtype(iCell), {'raw'}) && isfreq
       if iscomp
-        data = removefields(data, {'topo', 'topolabel', 'unmixing'}); % these fields are not desired
+        data = removefields(data, {'topo', 'topolabel', 'topodimord', 'unmixing', 'unmixingdimord'}); % these fields are not desired
         iscomp = 0;
       end
       data = freq2raw(data);
@@ -462,13 +481,13 @@ if ~isempty(dtype)
     elseif isequal(dtype(iCell), {'raw'}) && ischan
       data = chan2timelock(data);
       data = timelock2raw(data);
-      data = ft_datatype_raw(data);
+      data = ft_datatype_raw(data, 'hassampleinfo', hassampleinfo);
       ischan = 0;
       israw = 1;
       okflag = 1;
     elseif isequal(dtype(iCell), {'timelock'}) && ischan
       data = chan2timelock(data);
-      data = ft_datatype_timelock(data);
+      data = ft_datatype_timelock(data, 'hassampleinfo', hassampleinfo);
       ischan = 0;
       istimelock = 1;
       okflag = 1;
@@ -495,13 +514,18 @@ if ~isempty(dtype)
   
   if ~okflag
     % construct an error message
-    if length(dtype)>1
-      str = sprintf('%s, ', dtype{1:(end-2)});
-      str = sprintf('%s%s or %s', str, dtype{end-1}, dtype{end});
-    else
-      str = dtype{1};
+    typestr = printor(dtype, true);
+    helpfun = cell(size(dtype));
+    for i=1:numel(dtype)
+      helpfun{i} = sprintf('ft_datatype_%s', dtype{i});
     end
-    ft_error('This function requires %s data as input.', str);
+    helpfun = helpfun(cellfun(@exist, helpfun)>0);
+    if ~isempty(helpfun)
+      helpstr = printor(helpfun);
+      ft_error('This function requires %s data as input, see %s.', typestr, helpstr);
+    else
+      ft_error('This function requires %s data as input.', typestr);
+    end
   end % if okflag
 end
 
@@ -518,13 +542,7 @@ if ~isempty(dimord)
   
   if ~okflag
     % construct an error message
-    if length(dimord)>1
-      str = sprintf('%s, ', dimord{1:(end-2)});
-      str = sprintf('%s%s or %s', str, dimord{end-1}, dimord{end});
-    else
-      str = dimord{1};
-    end
-    ft_error('This function requires data with a dimord of %s.', str);
+    ft_error('This function requires data with a dimord of %s.', printor(dimord, true));
   end % if okflag
 end
 
@@ -542,17 +560,14 @@ if ~isempty(stype)
     else
       okflag = 0;
     end
+  else
+    % the data does not contain a sensor array
+    okflag = 0;
   end
   
   if ~okflag
     % construct an error message
-    if length(stype)>1
-      str = sprintf('%s, ', stype{1:(end-2)});
-      str = sprintf('%s%s or %s', str, stype{end-1}, stype{end});
-    else
-      str = stype{1};
-    end
-    ft_error('This function requires %s data as input, but you are giving %s data.', str, ft_senstype(data));
+    ft_error('This function requires data with an %s sensor array.', printor(stype, true));
   end % if okflag
 end
 
@@ -567,6 +582,20 @@ if ~isempty(ismeg)
     ft_error('This function requires MEG data with a ''grad'' field');
   elseif ~okflag && isequal(ismeg, 'no')
     ft_error('This function should not be given MEG data with a ''grad'' field');
+  end % if okflag
+end
+
+if ~isempty(iseeg)
+  if isequal(iseeg, 'yes')
+    okflag = isfield(data, 'elec');
+  elseif isequal(iseeg, 'no')
+    okflag = ~isfield(data, 'elec');
+  end
+  
+  if ~okflag && isequal(iseeg, 'yes')
+    ft_error('This function requires EEG data with an ''elec'' field');
+  elseif ~okflag && isequal(iseeg, 'no')
+    ft_error('This function should not be given EEG data with an ''elec'' field');
   end % if okflag
 end
 
@@ -623,7 +652,7 @@ elseif isequal(hastrials, 'no') && istimelock
     % average on the fly
     tmpcfg = [];
     tmpcfg.keeptrials = 'no';
-    data = ft_timelockanalysis(tmpcfg, data); 
+    data = ft_timelockanalysis(tmpcfg, data);
   end
 end
 

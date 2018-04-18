@@ -71,7 +71,7 @@ stack = stack(3:end);
 
 % remove the non-FieldTrip functions from the path, these should not be part of the default message identifier
 keep = true(size(stack));
-[v, p] = ft_version;
+p = fileparts(which('ft_defaults'));
 for i=1:numel(stack)
   keep(i) = strncmp(p, stack(i).file, length(p));
 end
@@ -337,7 +337,7 @@ switch varargin{1}
         ft_default.notification.(level) = s;
         % the remainder is fully handled by the ERROR function
         if ~isempty(msgId)
-          error(msgId, varargin{:});
+          error(state);
         else
           error(varargin{:});
         end
