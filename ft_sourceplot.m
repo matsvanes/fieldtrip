@@ -1265,7 +1265,7 @@ switch cfg.method
         else
             % functional values have been transformed to be scaled
             set(hc,'ticks',(0:0.1:1));
-            set(hc,'ticklabels',round(100*linspace(fcolmin,fcolmax,numel(get(hc,'ticks'))'))./100);
+            set(hc,'ticklabels',(100*linspace(fcolmin,fcolmax,numel(get(hc,'ticks'))'))./100);
         end
       else
         ft_warning('no colorbar possible without functional data')
