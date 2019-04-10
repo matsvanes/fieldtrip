@@ -153,9 +153,12 @@ url = {
   'BREWERMAP'     'see https://nl.mathworks.com/matlabcentral/fileexchange/45208-colorbrewer--attractive-and-distinctive-colormaps'
   'CELLFUNCTION'  'see https://github.com/schoffelen/cellfunction'
   'MARS'          'see http://www.parralab.org/mars'
+  'LAGEXTRACTION' 'see https://github.com/agramfort/eeglab-plugin-ieee-tbme-2010'
   'JSONLAB'       'see https://se.mathworks.com/matlabcentral/fileexchange/33381-jsonlab--a-toolbox-to-encode-decode-json-files'
   'MFFMATLABIO'   'see https://github.com/arnodelorme/mffmatlabio'
   'JSONIO'        'see https://github.com/gllmflndn/JSONio'
+  'CPD'           'see https://sites.google.com/site/myronenko/research/cpd'
+  'MVPA-LIGHT'    'see https://github.com/treder/MVPA-Light'
   };
 
 if nargin<2
@@ -215,6 +218,8 @@ switch toolbox
     dependency = {'rawdata', 'channames'};
   case 'MEG-CALC'
     dependency = {'megmodel', 'megfield', 'megtrans'};
+  case 'MVPA-LIGHT'
+    dependency = {'mv_crossvalidate','train_lda'};
   case 'BIOSIG'
     dependency = {'sopen', 'sread'};
   case 'EEG'
@@ -324,8 +329,8 @@ switch toolbox
   case 'NETCDF'
     dependency = {'netcdf'};
   case 'MYSQL'
-    % not sure if 'which' would work fine here, so use 'exist'
-    dependency = has_mex('mysql'); % this only consists of a single mex file
+    % this only consists of a single mex file
+    dependency = has_mex('mysql'); 
   case 'ISO2MESH'
     dependency = {'vol2surf', 'qmeshcut'};
   case 'QSUB'
@@ -379,12 +384,16 @@ switch toolbox
     dependency = {'ghdf5read' 'ghdf5fileimport'};
   case 'MARS'
     dependency = {'spm_mars_mrf'};
+  case 'LAGEXTRACTION'
+    dependency = {'extractlag' 'perform_realign'};
   case 'JSONLAB'
     dependency = {'loadjson' 'savejson'};
   case 'PLOTLY'
     dependency = {'fig2plotly' 'savejson'};
   case 'JSONIO'
     dependency = {'jsonread', 'jsonwrite', 'jsonread.mexa64'};
+  case 'CPD'
+    dependency = {'cpd', 'cpd_affine', 'cpd_P'};
     
     % the following are FieldTrip modules/toolboxes
   case 'FILEIO'
@@ -505,20 +514,35 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function status = myaddpath(toolbox, silent)
 global ft_default
+
+if ~isfolder(toolbox)
+  % search for a case-insensitive match, this is needed for MVPA-Light
+  [p, f, ~] = fileparts(toolbox);
+  dirlist = dir(p);
+  sel = strcmpi({dirlist.name}, f);
+  if sum(sel)==1
+    toolbox = fullfile(p, dirlist(sel).name);
+  end
+end
+  
 if isdeployed
   ft_warning('cannot change path settings for %s in a compiled application', toolbox);
   status = true;
-elseif exist(toolbox, 'dir')
+elseif isfolder(toolbox)
   if ~silent
     ft_warning('off','backtrace');
     ft_warning('adding %s toolbox to your MATLAB path', toolbox);
     ft_warning('on','backtrace');
   end
-  if any(~cellfun(@isempty, regexp(toolbox, {'spm2', 'spm5', 'spm8', 'spm12'})))
+  if any(~cellfun(@isempty, regexp(lower(toolbox), {'spm2$', 'spm5$', 'spm8$', 'spm12$'})))
     % SPM needs to be added with all its subdirectories
     addpath(genpath(toolbox));
     % check whether the mex files are compatible
     check_spm_mex;
+  elseif ~isempty(regexp(lower(toolbox), 'mvpa-light$'))
+    % this comes with its own startup script
+    addpath(fullfile(toolbox, 'startup'))
+    startup_MVPA_Light;
   else
     addpath(toolbox);
   end
@@ -579,11 +603,9 @@ end
 function status = is_subdir_in_fieldtrip_path(toolbox_name)
 fttrunkpath = unixpath(fileparts(which('ft_defaults')));
 fttoolboxpath = fullfile(fttrunkpath, lower(toolbox_name));
-
-needle=[pathsep fttoolboxpath pathsep];
+needle   = [pathsep fttoolboxpath pathsep];
 haystack = [pathsep path() pathsep];
-
-status = ~isempty(findstr(needle, haystack));
+status   = contains(haystack, needle);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % helper function
