@@ -74,21 +74,21 @@ switch fileformat
     
   case 'artinis_oxy3'
     ft_hastoolbox('artinis', 1);
-    hdr = read_oxy3_header(filename, true);    
+    hdr = read_artinis_oxy3(filename, false);    
     sens = hdr.opto;
     
   case 'artinis_oxyproj'
     ft_hastoolbox('artinis', 1);
-    hdr = read_oxyproj_header(filename); 
+    hdr = read_artinis_oxyproj(filename); 
     sens = hdr.opto;
 
   case 'polhemus_pos'
-    sens = read_brainvision_pos(filename);
+    sens = read_polhemus_pos(filename);
 
   case 'besa_elp'
     ft_error('unknown fileformat for electrodes or gradiometers');
     % the code below does not yet work
-    fid = fopen(filename);
+    fid = fopen_or_error(filename);
     % the ascii file contains: type, label, angle, angle
     tmp = textscan(fid, '%s%s%f%f');
     fclose(fid);
@@ -273,7 +273,7 @@ switch fileformat
     sens.fid.label = sens.fid.label(:);
 
   case '4d_el_ascii'
-    fid = fopen(filename, 'rt');
+    fid = fopen_or_error(filename, 'rt');
     c = textscan(fid, '%s%s%f%f%f');
     l = c{:,1}; % label
     s = c{:,2}; % status, it can be 'Collected' or empty
@@ -305,7 +305,7 @@ switch fileformat
 
   case {'localite_pos','localite_ins'}
     if ~usejava('jvm') % Using xml2struct requires java
-      fid = fopen(filename);
+      fid = fopen_or_error(filename);
 
       % Read marker-file and store contents in cells of strings
       tmp = textscan(fid,'%s');
@@ -376,7 +376,7 @@ switch fileformat
 
   case 'easycap_txt'
     % Read the file and store all contents in cells of strings
-    fid = fopen(filename);
+    fid = fopen_or_error(filename);
     tmp = textscan(fid,'%s%s%s%s');
     fclose(fid);
 

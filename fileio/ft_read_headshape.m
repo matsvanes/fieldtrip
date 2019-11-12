@@ -32,6 +32,8 @@ function [shape] = ft_read_headshape(filename, varargin)
 %   'matlab'       containing FieldTrip or BrainStorm headshapes or cortical meshes
 %   'stl'          STereoLithography file format, for use with CAD and/or generic 3D mesh editing programs
 %   'vtk'          Visualization ToolKit file format, for use with Paraview
+%   'vtk_xml'      Visualization ToolKit file format
+%   'tck'          Mrtrix track file
 %   'mne_*'        MNE surface description in ASCII format ('mne_tri') or MNE source grid in ascii format, described as 3D points ('mne_pos')
 %   'obj'          Wavefront .obj file obtained with the structure.io
 %   'off'
@@ -59,7 +61,7 @@ function [shape] = ft_read_headshape(filename, varargin)
 %
 % See also FT_READ_HEADMODEL, FT_READ_SENS, FT_READ_ATLAS, FT_WRITE_HEADSHAPE
 
-% Copyright (C) 2008-2017 Robert Oostenveld
+% Copyright (C) 2008-2019 Robert Oostenveld
 %
 % This file is part of FieldTrip, see http://www.fieldtriptoolbox.org
 % for the documentation and details.
@@ -81,6 +83,7 @@ function [shape] = ft_read_headshape(filename, varargin)
 
 % get the options
 annotationfile = ft_getopt(varargin, 'annotationfile');
+useimage       = ft_getopt(varargin, 'useimage', true); % use image if hasimage
 concatenate    = ft_getopt(varargin, 'concatenate', 'yes');
 coordsys       = ft_getopt(varargin, 'coordsys', 'head');    % for ctf or neuromag_mne coil positions, the alternative is dewar
 fileformat     = ft_getopt(varargin, 'format');
@@ -198,7 +201,7 @@ end % if iscell
 
 % checks if there exists a .jpg file of 'filename'
 [pathstr,name]  = fileparts(filename);
-if exist(fullfile(pathstr,[name,'.jpg']))
+if exist(fullfile(pathstr,[name,'.jpg'])) && useimage
   image    = fullfile(pathstr,[name,'.jpg']);
   hasimage = true;
 else
@@ -787,7 +790,7 @@ switch fileformat
     shape.fid.label(1:3)= {'nas', 'lpa', 'rpa'};
     
   case 'yokogawa_hsp'
-    fid = fopen(filename, 'rt');
+    fid = fopen_or_error(filename, 'rt');
     
     fidstart = false;
     hspstart = false;
@@ -946,32 +949,63 @@ switch fileformat
   case 'obj'
     ft_hastoolbox('wavefront', 1);
     % Only tested for structure.io .obj thus far
-    obj = read_wobj(filename);
-    shape.pos     = obj.vertices(:,1:3);
-    shape.pos     = shape.pos - repmat(sum(shape.pos)/length(shape.pos),[length(shape.pos),1]); %centering vertices
-    shape.tri     = obj.objects(end).data.vertices;
-    if hasimage
-      texture = obj.vertices_texture;
-      
+    [vertex, faces, texture, ~] = read_obj_new(filename);
+    
+    shape.pos   = vertex;
+    shape.pos   = shape.pos - repmat(sum(shape.pos)/length(shape.pos),...
+        [length(shape.pos),1]); %centering vertices
+    shape.tri   = faces(1:end-1,:,:); % remove the last row which is zeros
+    
+    if hasimage      
       % Refines the mesh and textures to increase resolution of the colormapping
-      [shape.pos, shape.tri, texture] = refine(shape.pos, shape.tri, 'banks', texture);
+      [shape.pos, shape.tri, texture] = refine(shape.pos, shape.tri,...
+          'banks', texture);
       
       picture = imread(image);
-      color   = uint8(zeros(length(shape.pos),3));
+      color   = (zeros(length(shape.pos),3));
       for i=1:length(shape.pos)
-        color(i,1:3) = picture(floor((1-texture(i,2))*length(picture)),1+floor(texture(i,1)*length(picture)),1:3);
+        color(i,1:3) = picture(floor((1-texture(i,2))*length(picture)),...
+            1+floor(texture(i,1)*length(picture)),1:3);
       end
+      
+      % If color is specified as 0-255 rather than 0-1 correct by dividing
+      % by 255
+      if range(color(:)) > 1
+          color = color./255;
+      end
+      
       shape.color = color;
-    elseif size(obj.vertices,2)==6
+
+    elseif size(vertex,2)==6
       % the vertices also contain RGB colors
-      shape.color = obj.vertices(:,4:6);
+      
+      color = vertex(:,4:6);
+      % If color is specified as 0-255 rather than 0-1 correct by dividing
+      % by 255
+      if range(color(:)) > 1
+          color = color./255;
+      end
+      
+      shape.color = color;
     end
     
   case 'vtk'
     [pos, tri] = read_vtk(filename);
     shape.pos = pos;
     shape.tri = tri;
-    
+  
+  case 'vtk_xml'
+    data = read_vtk_xml(filename);
+    shape.orig = data;
+    shape.pos  = data.Points;
+    if isfield(data, 'Lines')
+      shape.line = data.Lines;
+    end
+  
+  case 'mrtrix_tck'
+    ft_hastoolbox('mrtrix', 1);
+    shape = read_tck(filename);
+  
   case 'off'
     [pos, plc] = read_off(filename);
     shape.pos  = pos;
@@ -1088,7 +1122,7 @@ switch fileformat
     shape.unit = 'unkown';
     
     if exist([filename '.minf'], 'file')
-      minffid = fopen([filename '.minf']);
+      minffid = fopen_or_error([filename '.minf']);
       hdr=fgetl(minffid);
       tfm_idx = strfind(hdr,'''transformations'':') + 21;
       transform = sscanf(hdr(tfm_idx:end),'%f,',[4 4])';
@@ -1164,7 +1198,7 @@ switch fileformat
     end
     
   case 'neuromag_mesh'
-    fid = fopen(filename, 'rt');
+    fid = fopen_or_error(filename, 'rt');
     npos = fscanf(fid, '%d', 1);
     pos = fscanf(fid, '%f', [6 npos])';
     ntri = fscanf(fid, '%d', 1);
@@ -1246,3 +1280,4 @@ shape = fixpos(shape);
 
 % ensure that the numerical arrays are represented in double precision and not as integers
 shape = ft_struct2double(shape);
+end

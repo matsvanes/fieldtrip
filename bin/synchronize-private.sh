@@ -38,6 +38,14 @@ ARRAY+=(forward/private/ama2headmodel.m)
 sync ${ARRAY[*]}
 
 ################################################################################
+# appendstruct.m
+
+ARRAY=()
+ARRAY+=(utilities/appendstruct.m)
+ARRAY+=(fileio/private/appendstruct.m)
+sync ${ARRAY[*]}
+
+################################################################################
 # atlas_lookup.m
 
 ARRAY=()
@@ -400,6 +408,7 @@ ARRAY=()
 ARRAY+=(fileio/private/elproj.m)
 ARRAY+=(forward/private/elproj.m)
 ARRAY+=(plotting/private/elproj.m)
+ARRAY+=(test/private/elproj.m)
 ARRAY+=(private/elproj.m)
 sync ${ARRAY[*]}
 
@@ -564,6 +573,14 @@ ARRAY+=(utilities/private/fixsampleinfo.m)
 sync ${ARRAY[*]}
 
 ################################################################################
+# fopen_or_error.m
+
+ARRAY=()
+ARRAY+=(private/fopen_or_error.m)
+ARRAY+=(fileio/private/fopen_or_error.m)
+sync ${ARRAY[*]}
+
+################################################################################
 # ft_apply_montage.m
 
 ARRAY=()
@@ -719,6 +736,7 @@ sync ${ARRAY[*]}
 
 ARRAY=()
 ARRAY+=(fileio/private/ft_fetch_data.m)
+ARRAY+=(test/private/ft_fetch_data.m)
 ARRAY+=(utilities/ft_fetch_data.m)
 sync ${ARRAY[*]}
 
@@ -1302,6 +1320,14 @@ sync ${ARRAY[*]}
 ARRAY=()
 ARRAY+=(connectivity/private/inv3x3.mexw64)
 ARRAY+=(src/inv3x3.mexw64)
+sync ${ARRAY[*]}
+
+################################################################################
+# isdir_or_mkdir.m
+
+ARRAY=()
+ARRAY+=(fileio/private/isdir_or_mkdir.m)
+ARRAY+=(private/isdir_or_mkdir.m)
 sync ${ARRAY[*]}
 
 ################################################################################

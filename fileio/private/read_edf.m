@@ -94,11 +94,7 @@ if needhdr
   cname=computer;
   if cname(1:2)=='PC' SLASH=BSLASH; end
 
-  fid=fopen(FILENAME,'r','ieee-le');
-  if fid<0
-    fprintf(2,['Error LOADEDF: File ' FILENAME ' not found\n']);
-    return;
-  end
+  fid=fopen_or_error(FILENAME,'r','ieee-le');
 
   EDF.FILE.FID=fid;
   EDF.FILE.OPEN = 1;
@@ -184,7 +180,9 @@ if needhdr
   fseek(EDF.FILE.FID,32*EDF.NS,0);
 
   EDF.Cal = (EDF.PhysMax-EDF.PhysMin)./(EDF.DigMax-EDF.DigMin);
+  EDF.Cal(isnan(EDF.Cal)) = 0;
   EDF.Off = EDF.PhysMin - EDF.Cal .* EDF.DigMin;
+  
   %tmp = find(EDF.Cal < 0);
   %EDF.Cal(tmp) = ones(size(tmp));
   %EDF.Off(tmp) = zeros(size(tmp));
@@ -211,15 +209,15 @@ if needhdr
     else
       EDF.ChanTyp(k)=' ';
     end
-    if findstr(upper(EDF.Label(k,:)),'ECG')
+    if contains(upper(EDF.Label(k,:)),'ECG')
       EDF.ChanTyp(k)='C';
-    elseif findstr(upper(EDF.Label(k,:)),'EKG')
+    elseif contains(upper(EDF.Label(k,:)),'EKG')
       EDF.ChanTyp(k)='C';
-    elseif findstr(upper(EDF.Label(k,:)),'EEG')
+    elseif contains(upper(EDF.Label(k,:)),'EEG')
       EDF.ChanTyp(k)='E';
-    elseif findstr(upper(EDF.Label(k,:)),'EOG')
+    elseif contains(upper(EDF.Label(k,:)),'EOG')
       EDF.ChanTyp(k)='O';
-    elseif findstr(upper(EDF.Label(k,:)),'EMG')
+    elseif contains(upper(EDF.Label(k,:)),'EMG')
       EDF.ChanTyp(k)='M';
     end
   end
